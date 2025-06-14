@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "530378717479",
+    "firebase_url": "https://gourabaryanlukeshrajesh-default-rtdb.firebaseio.com",
+    "project_id": "gourabaryanlukeshrajesh",
+    "storage_bucket": "gourabaryanlukeshrajesh.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:530378717479:android:71b828f5b556bf32221102",
+        "android_client_info": {
+          "package_name": "com.example.securesamvad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFnf_6o-6HDlU5OdlWs5DJ_8bVpsisxD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

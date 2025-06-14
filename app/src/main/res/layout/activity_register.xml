@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    tools:context=".activity.RegisterActivity">
+
+    <ImageView
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_marginBottom="40dp"
+        android:src="@drawable/app_logo"
+        >
+
+    </ImageView>
+
+
+    <!-- White Rounded Bottom Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:background="@drawable/round_white_background">
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enter Number!"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black" />
+
+        <!-- Subtitle -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Please enter your Mobile Number"
+            android:textSize="14sp"
+            android:textColor="#777777"
+            android:layout_marginTop="4dp" />
+
+        <!-- Phone Input -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/bottom_line"
+            android:paddingBottom="4dp">
+
+            <!-- Country Flag (Icon) -->
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+
+                android:layout_marginEnd="8dp"
+                android:contentDescription="India Flag" />
+
+            <!-- Country Code -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+91"
+                android:textSize="16sp"
+                android:textColor="@android:color/black" />
+
+            <!-- Down Arrow -->
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/baseline_arrow_drop_down_24"
+                android:layout_marginEnd="12dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Dropdown Arrow" />
+
+            <!-- Phone Number Input -->
+            <EditText
+                android:id="@+id/Mobile"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="1234 566 892"
+                android:inputType="phone"
+                android:padding="0dp"
+                android:textColor="@android:color/black"
+                android:textSize="16sp"
+                tools:ignore="TouchTargetSizeCheck" />
+        </LinearLayout>
+
+        <!-- OTP Info -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="A 4 digit OTP will be sent via SMS to verify your mobile number!"
+            android:textSize="12sp"
+            android:textColor="#888888"
+            android:layout_marginTop="8dp" />
+
+        <!-- Next Button -->
+        <Button
+            android:id="@+id/Next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Next"
+            android:textColor="@android:color/black"
+            android:backgroundTint="#FFD54F" />
+    </LinearLayout>
+</LinearLayout>
