@@ -17,8 +17,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.securesamvad.R;
 import com.example.securesamvad.adapter.MessageAdapter;
-import com.example.securesamvad.crypto.CryptoHelper;
 import com.example.securesamvad.crypto.CryptoAES;
+import com.example.securesamvad.crypto.CryptoHelper;
 import com.example.securesamvad.model.Message;
 import com.example.securesamvad.model.User;
 import com.google.firebase.auth.FirebaseAuth;
@@ -30,8 +30,8 @@ import java.util.*;
 public class ChatActivity extends AppCompatActivity {
 
     private RecyclerView messageRV;
-    private EditText messageInput;
-    private ImageView sendBtn;
+    private EditText     messageInput;
+    private ImageView    sendBtn;
 
     private final List<Message> messages = new ArrayList<>();
     private MessageAdapter adapter;
@@ -41,78 +41,74 @@ public class ChatActivity extends AppCompatActivity {
 
     private DatabaseReference myMsgRef, yourMsgRef, rootUsers;
 
-    // E2EE keys
-    private String myPubKey;           // Base64
-    private String receiverPubKey;     // Base64
+    /* E2EE */
+    private String myPubKey;        // Base64 of *this* device
+    private String receiverPubKey;  // Base64 of the chat partner
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    /* ------------------------------------------------------------------ */
+    @Override protected void onCreate(Bundle saved) {
+        super.onCreate(saved);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_chat);
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, i) -> {
-            Insets insets = i.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            return i;
-        });
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v,i)->{
+            Insets s=i.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(s.left,s.top,s.right,s.bottom); return i; });
 
-        // Firebase IDs
+        /* -------- extras -------- */
         senderId      = FirebaseAuth.getInstance().getUid();
         receiverId    = getIntent().getStringExtra("receiverId");
         receiverName  = getIntent().getStringExtra("receiverName");
         receiverPhone = getIntent().getStringExtra("receiverPhone");
-
         if (receiverId == null) { finish(); return; }
         if (receiverName == null)  receiverName  = receiverId;
-        if (receiverPhone == null) receiverPhone = "";
+        if (receiverPhone== null)  receiverPhone = "";
 
-        // Set receiver info
-        ((TextView) findViewById(R.id.userName)).setText(receiverName);
-        ((TextView) findViewById(R.id.number)).setText(receiverPhone);
+        ((TextView)findViewById(R.id.userName)).setText(receiverName);
+        ((TextView)findViewById(R.id.number  )).setText(receiverPhone);
 
-        // Firebase paths
+        /* -------- Firebase paths -------- */
         rootUsers  = FirebaseDatabase.getInstance().getReference("users");
-        myMsgRef   = rootUsers.child(senderId).child("chats").child(receiverId).child("messages");
-        yourMsgRef = rootUsers.child(receiverId).child("chats").child(senderId).child("messages");
+        myMsgRef   = rootUsers.child(senderId) .child("chats").child(receiverId).child("messages");
+        yourMsgRef = rootUsers.child(receiverId).child("chats").child(senderId ).child("messages");
 
-        // Get my public key
-        try {
-            myPubKey = CryptoHelper.getMyPublicKey(this);
-        } catch (Exception e) {
-            Toast.makeText(this, "Key error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        /* -------- my public key -------- */
+        try { myPubKey = CryptoHelper.getMyPublicKey(this); }
+        catch (Exception e) {
+            Toast.makeText(this,"Key error: "+e,Toast.LENGTH_LONG).show();
             finish(); return;
         }
 
-        // Get receiver's public key from Firebase
+        /* -------- load receiver pubKey THEN attach listener -------- */
         rootUsers.child(receiverId).child("pubKey")
                 .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        receiverPubKey = snapshot.getValue(String.class);
+                    @Override public void onDataChange(@NonNull DataSnapshot snap) {
+                        receiverPubKey = snap.getValue(String.class);
                         if (receiverPubKey == null) {
-                            Toast.makeText(ChatActivity.this, "Receiver has no public key!", Toast.LENGTH_LONG).show();
-                            finish();
+                            Toast.makeText(ChatActivity.this,
+                                    "Receiver hasn’t upgraded the app yet.",Toast.LENGTH_LONG).show();
+                            finish(); return;
                         }
+                        attachMessageListener();      // ✅ now keys are ready
                     }
-
-                    @Override public void onCancelled(@NonNull DatabaseError error) {}
+                    @Override public void onCancelled(@NonNull DatabaseError e) { }
                 });
 
-        // Save meta info (unchanged)
+        /* -------- meta / recency (unchanged) -------- */
         long now = System.currentTimeMillis();
         String myPhone = FirebaseAuth.getInstance().getCurrentUser().getPhoneNumber();
 
-        rootUsers.child(senderId).child("chats").child(receiverId).child("meta")
+        rootUsers.child(senderId ).child("chats").child(receiverId).child("meta")
                 .setValue(new User(receiverId, receiverPhone, receiverName, now));
-        rootUsers.child(senderId).child("chats").child(receiverId).child("lastTimestamp")
+        rootUsers.child(senderId ).child("chats").child(receiverId).child("lastTimestamp")
                 .setValue(now);
 
-        rootUsers.child(receiverId).child("chats").child(senderId).child("meta")
+        rootUsers.child(receiverId).child("chats").child(senderId ).child("meta")
                 .setValue(new User(senderId, myPhone, "You", now));
-        rootUsers.child(receiverId).child("chats").child(senderId).child("lastTimestamp")
+        rootUsers.child(receiverId).child("chats").child(senderId ).child("lastTimestamp")
                 .setValue(now);
 
-        // Setup UI
+        /* -------- UI -------- */
         messageRV    = findViewById(R.id.messageRecyclerView);
         messageInput = findViewById(R.id.messageInput);
         sendBtn      = findViewById(R.id.sendBtn);
@@ -123,81 +119,79 @@ public class ChatActivity extends AppCompatActivity {
         messageRV.setLayoutManager(lm);
         messageRV.setAdapter(adapter);
 
-        // --- Listen to messages (with decryption) ---
+        /* -------- send button -------- */
+        sendBtn.setOnClickListener(v -> sendMessage());
+    }
+
+    /* ------------------------------------------------------------------ */
+    private void attachMessageListener() {
+
         myMsgRef.addValueEventListener(new ValueEventListener() {
-            @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (receiverPubKey == null) return; // wait until key is fetched
+            @Override public void onDataChange(@NonNull DataSnapshot snap) {
 
                 messages.clear();
-                for (DataSnapshot ds : snapshot.getChildren()) {
+                for (DataSnapshot ds : snap.getChildren()) {
+
                     String cipher64 = ds.child("cipher").getValue(String.class);
                     String iv64     = ds.child("iv").getValue(String.class);
                     String sId      = ds.child("senderId").getValue(String.class);
                     Long   ts       = ds.child("timestamp").getValue(Long.class);
-                    if (cipher64 == null || iv64 == null || sId == null || ts == null) continue;
+                    if (cipher64==null || iv64==null || sId==null || ts==null) continue;
 
                     try {
-                        String otherPub = sId.equals(senderId) ? receiverPubKey : myPubKey;
-                        byte[] shared   = CryptoHelper.deriveSharedKey(otherPub);
-                        String plain    = CryptoAES.decrypt(cipher64, iv64, shared);
-
+                        /* always derive with the other party’s pubKey */
+                        byte[] shared = CryptoHelper.deriveSharedKey(receiverPubKey);
+                        String plain  = CryptoAES.decrypt(cipher64, iv64, shared);
                         messages.add(new Message(ds.getKey(), sId, plain, ts));
-                    } catch (GeneralSecurityException e) {
-                        // ignore invalid messages
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+
+                    } catch (GeneralSecurityException ignored) { /* bad msg */ }
+                    catch (Exception e) { e.printStackTrace(); }
                 }
-                messages.sort((a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp()));
+
+                messages.sort((a,b)-> Long.compare(a.getTimestamp(), b.getTimestamp()));
                 adapter.setMessages(messages);
-                messageRV.scrollToPosition(adapter.getItemCount() - 1);
+                messageRV.scrollToPosition(adapter.getItemCount()-1);
             }
-
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
+            @Override public void onCancelled(@NonNull DatabaseError e) { }
         });
+    }
 
-        // --- Send encrypted message ---
-        sendBtn.setOnClickListener(v -> {
-            String plain = messageInput.getText().toString().trim();
-            if (plain.isEmpty()) return;
+    /* ------------------------------------------------------------------ */
+    private void sendMessage() {
 
-            if (receiverPubKey == null) {
-                Toast.makeText(this, "Still loading receiver key…", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        String plain = messageInput.getText().toString().trim();
+        if (plain.isEmpty()) return;
+        if (receiverPubKey == null) {
+            Toast.makeText(this,"Still loading key…",Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            try {
-                byte[] shared = CryptoHelper.deriveSharedKey(receiverPubKey);
-                CryptoAES.Bundle encrypted = CryptoAES.encrypt(plain, shared);
+        try {
+            byte[] shared = CryptoHelper.deriveSharedKey(receiverPubKey);
+            CryptoAES.Bundle enc = CryptoAES.encrypt(plain, shared);
 
-                String id = UUID.randomUUID().toString();
-                long ts = System.currentTimeMillis();
+            String id = UUID.randomUUID().toString();
+            long   ts = System.currentTimeMillis();
 
-                Map<String, Object> map = new HashMap<>();
-                map.put("cipher",   encrypted.cipher64);
-                map.put("iv",       encrypted.iv64);
-                map.put("senderId", senderId);
-                map.put("timestamp", ts);
+            Map<String,Object> map = new HashMap<>();
+            map.put("cipher",   enc.cipher64);
+            map.put("iv",       enc.iv64);
+            map.put("senderId", senderId);
+            map.put("timestamp",ts);
 
-                myMsgRef.child(id).setValue(map);
-                yourMsgRef.child(id).setValue(map);
+            myMsgRef  .child(id).setValue(map);
+            yourMsgRef.child(id).setValue(map);
 
-                // Update meta info
-                rootUsers.child(senderId).child("chats").child(receiverId).child("meta")
-                        .setValue(new User(receiverId, receiverPhone, receiverName, ts));
-                rootUsers.child(senderId).child("chats").child(receiverId).child("lastTimestamp")
-                        .setValue(ts);
+            /* update recency */
+            rootUsers.child(senderId ).child("chats").child(receiverId).child("lastTimestamp")
+                    .setValue(ts);
+            rootUsers.child(receiverId).child("chats").child(senderId ).child("lastTimestamp")
+                    .setValue(ts);
 
-                rootUsers.child(receiverId).child("chats").child(senderId).child("meta")
-                        .setValue(new User(senderId, myPhone, "You", ts));
-                rootUsers.child(receiverId).child("chats").child(senderId).child("lastTimestamp")
-                        .setValue(ts);
+            messageInput.setText("");
 
-                messageInput.setText("");
-
-            } catch (Exception e) {
-                Toast.makeText(this, "Encrypt error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
+        } catch (Exception e) {
+            Toast.makeText(this,"Encrypt error: "+e,Toast.LENGTH_LONG).show();
+        }
     }
 }

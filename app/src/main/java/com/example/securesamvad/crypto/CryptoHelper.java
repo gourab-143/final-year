@@ -2,72 +2,95 @@ package com.example.securesamvad.crypto;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyProperties;
+import android.security.keystore.*;
 import android.util.Base64;
 
 import java.security.*;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.ECGenParameterSpec;
 import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.KeyAgreement;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 /**
- *  Handles X25519 key‑pair (Android Keystore) + ECDH shared secret.
+ * Generates a long‑term keypair in AndroidKeystore.
+ *  • Tries X25519 (API 31+).
+ *  • Fallback: P‑256 ECDH (works on Android 5‑11).
+ * Derives a 32‑byte shared secret for AES.
  */
-public  class CryptoHelper {
+public final class CryptoHelper {
 
-    private static final String ALIAS    = "SecureSamvadKey";
-    private static final String PREF     = "crypto_pref";
-    private static final String PREF_PUB = "PUB_KEY";
+    private static final String PREF_NAME = "crypto_pref";
+    private static final String PREF_PUB  = "PUB_KEY";
+    private static final String ALIAS     = "SecureSamvadKey";
+
+    private static final String ALG_X25519 = "X25519";
+    private static final String ALG_EC     = "EC";               // P‑256
+    private static final String CURVE_FALLBACK = "secp256r1";
+
+    private static final String KSTORE = "AndroidKeyStore";
 
     private CryptoHelper() {}
 
-    /** returns my Base64 public key, generating pair if first call */
+    /* ---------- get or create public key (Base64) ---------- */
     public static String getMyPublicKey(Context ctx) throws Exception {
 
-        SharedPreferences sp = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        SharedPreferences sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         String pub64 = sp.getString(PREF_PUB, null);
-        if (pub64 != null) return pub64;                        // already created
+        if (pub64 != null) return pub64;                // already generated
 
-        /* ------ generate new key‑pair in Keystore (X25519) ------ */
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance(
-                "X25519", "AndroidKeyStore");
+        /* try modern X25519, otherwise EC P‑256 */
+        KeyPair kp;
+        try {
+            kp = generateKeyPair(ALG_X25519, null);     // API 31 +
+        } catch (Exception e) {                         // fallback
+            kp = generateKeyPair(ALG_EC, new ECGenParameterSpec(CURVE_FALLBACK));
+        }
 
-        kpg.initialize(new KeyGenParameterSpec.Builder(
-                ALIAS,
-                KeyProperties.PURPOSE_AGREE_KEY)      // ECDH only
-                .setDigests(KeyProperties.DIGEST_NONE)        // not used
-                .build());
-
-        KeyPair kp = kpg.generateKeyPair();
-        byte[] pub = kp.getPublic().getEncoded();             // X.509 format
-
-        pub64 = Base64.encodeToString(pub, Base64.NO_WRAP);
+        pub64 = Base64.encodeToString(kp.getPublic().getEncoded(), Base64.NO_WRAP);
         sp.edit().putString(PREF_PUB, pub64).apply();
         return pub64;
     }
 
-    /** derives 32‑byte shared key with other party’s Base64 public key */
+    /* ---------- derive 32‑byte shared secret ---------- */
     public static byte[] deriveSharedKey(String theirPub64) throws Exception {
 
-        /* 1. load my private */
-        KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+        KeyStore ks = KeyStore.getInstance(KSTORE);
         ks.load(null);
         PrivateKey myPriv = (PrivateKey) ks.getKey(ALIAS, null);
 
-        /* 2. rebuild their public */
-        byte[] theirBytes = Base64.decode(theirPub64, Base64.NO_WRAP);
-        KeyFactory kf = KeyFactory.getInstance("X25519");
-        PublicKey theirPub = kf.generatePublic(new X509EncodedKeySpec(theirBytes));
+        String myAlg = myPriv.getAlgorithm();           // "X25519" or "EC"
 
-        /* 3. ECDH */
-        KeyAgreement ka = KeyAgreement.getInstance("X25519");
+        /* decode peer public key */
+        byte[] other = Base64.decode(theirPub64, Base64.NO_WRAP);
+        KeyFactory kf = KeyFactory.getInstance(myAlg);
+        PublicKey theirPub = kf.generatePublic(new X509EncodedKeySpec(other));
+
+        /* -------- FIX: use "ECDH" when algorithm is EC -------- */
+        String kaName = myAlg.equals(ALG_EC) ? "ECDH" : myAlg;   // ✔
+        KeyAgreement ka = KeyAgreement.getInstance(kaName);
+        /* ------------------------------------------------------ */
+
         ka.init(myPriv);
         ka.doPhase(theirPub, true);
-        byte[] shared = ka.generateSecret();      // 32 bytes
+        byte[] secret = ka.generateSecret();             // 32 or 33 bytes
+        return secret.length == 32 ? secret : trimTo32(secret);
+    }
 
-        return shared;                            // use directly as AES‑256 key
+    /* ---------- helpers ---------- */
+    private static KeyPair generateKeyPair(String alg, AlgorithmParameterSpec spec) throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(alg, KSTORE);
+        KeyGenParameterSpec.Builder b =
+                new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_AGREE_KEY)
+                        .setDigests(KeyProperties.DIGEST_NONE);
+        if (spec != null) b.setAlgorithmParameterSpec(spec);
+        kpg.initialize(b.build());
+        return kpg.generateKeyPair();
+    }
+
+    private static byte[] trimTo32(byte[] in) {
+        byte[] out = new byte[32];
+        System.arraycopy(in, in.length - 32, out, 0, 32);
+        return out;
     }
 }
