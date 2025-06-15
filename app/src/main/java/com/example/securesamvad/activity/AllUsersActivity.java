@@ -97,8 +97,8 @@ public class AllUsersActivity extends AppCompatActivity {
                             if (map.containsKey(p)) {
                                 Contact c = map.get(p);
                                 c.setRegistered(true);
-                                c.setUid(u.getUid());
-                            }
+                                String snapUid = u.getUid() != null ? u.getUid() : ds.getKey();
+                                c.setUid(snapUid);                            }
                         }
                         contactList.clear();
                         contactList.addAll(map.values());

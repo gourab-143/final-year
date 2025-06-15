@@ -2,6 +2,7 @@ package com.example.securesamvad.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -126,10 +127,15 @@ public class RegisterActivity extends AppCompatActivity {
         profile.put("phone", phone);             // keep fresh
         profile.put("name",  "New User");        // only used first time
 
+        profile.put("uid",   uid);
+
         try {
             String myPub = CryptoHelper.getMyPublicKey(this);
-            profile.put("pubKey", myPub);        // only inserted if not present
-        } catch (Exception ignored) { }
+            profile.put("pubKey", myPub);
+        } catch (Exception e) {
+            Log.e("Crypto", "Cannot generate key", e);         // NEW  (or Toast)
+            return;                                            // <‑‑ stop → let user retry
+        }
 
         DatabaseReference userRef =
                 FirebaseDatabase.getInstance().getReference("users").child(uid);

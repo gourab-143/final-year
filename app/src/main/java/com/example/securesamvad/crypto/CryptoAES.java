@@ -13,7 +13,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /** stateless AES‑256/GCM helpers */
-public  class CryptoAES {
+public final  class CryptoAES {
 
     private CryptoAES(){}
 

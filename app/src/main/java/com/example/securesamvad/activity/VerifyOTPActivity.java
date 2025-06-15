@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -154,10 +155,15 @@ public class VerifyOTPActivity extends AppCompatActivity {
         profile.put("phone", phone);
         profile.put("name",  "New User");
 
+        profile.put("uid",   uid);
+
         try {
             String myPub = CryptoHelper.getMyPublicKey(this);
             profile.put("pubKey", myPub);
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            Log.e("Crypto", "Cannot generate key", e);         // NEW  (or Toast)
+            return;                                            // <‑‑ stop → let user retry
+        }
 
         DatabaseReference userRef =
                 FirebaseDatabase.getInstance().getReference("users").child(uid);
