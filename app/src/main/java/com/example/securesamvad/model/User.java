@@ -8,6 +8,13 @@ public class User {
     private long   lastTimestamp;// ← NEW
 
     private String pubKey;
+    private String photoUrl;// NEW
+
+
+
+    private String Status;
+
+
 
 
 
@@ -35,4 +42,14 @@ public class User {
 
     public String getPubKey() { return pubKey; }
     public void setPubKey(String k){ pubKey = k; }
+
+    public String getPhotoUrl()   { return photoUrl; }
+    public void   setPhotoUrl(String p){ this.photoUrl = p; }
+    public void   setName(String n){ this.name = n; }// for edits
+    public String getStatus() {
+        return Status;
+    }
+    public void   setStatus(String s)  { this.Status = s; }
+
+
 }

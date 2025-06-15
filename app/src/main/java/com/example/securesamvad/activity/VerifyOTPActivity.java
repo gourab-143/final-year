@@ -13,8 +13,14 @@ import com.example.securesamvad.crypto.CryptoHelper;          // ✅
 import com.example.securesamvad.model.User;
 import com.google.firebase.FirebaseException;
 import com.google.firebase.auth.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class VerifyOTPActivity extends AppCompatActivity {
@@ -136,25 +142,38 @@ public class VerifyOTPActivity extends AppCompatActivity {
     }
 
     /* ---------------- save user (with pubKey) ---------------- */
+    /* ---------------- save user (with pubKey) ---------------- */
     private void saveUserToDatabase() {
-        FirebaseUser fu = FirebaseAuth.getInstance().getCurrentUser();
-        if (fu == null) return;
+        FirebaseUser f = FirebaseAuth.getInstance().getCurrentUser();
+        if (f == null) return;
 
-        User user = new User(fu.getUid(), fu.getPhoneNumber(), "New User");
+        String uid   = f.getUid();
+        String phone = f.getPhoneNumber();
+
+        Map<String,Object> profile = new HashMap<>();
+        profile.put("phone", phone);
+        profile.put("name",  "New User");
+
         try {
-            String myPub = CryptoHelper.getMyPublicKey(this);   // ✅
-            user.setPubKey(myPub);
-        } catch (Exception e) {
-            Toast.makeText(this,"Key error: "+e.getMessage(),Toast.LENGTH_LONG).show();
-        }
+            String myPub = CryptoHelper.getMyPublicKey(this);
+            profile.put("pubKey", myPub);
+        } catch (Exception ignored) { }
 
-        FirebaseDatabase.getInstance().getReference("users")
-                .child(fu.getUid())
-                .setValue(user)
-                .addOnFailureListener(e ->
-                        Toast.makeText(this,
-                                "Save failed: "+e.getMessage(), Toast.LENGTH_LONG).show());
+        DatabaseReference userRef =
+                FirebaseDatabase.getInstance().getReference("users").child(uid);
+
+        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override public void onDataChange(@NonNull DataSnapshot snap) {
+                if (!snap.exists()) {
+                    userRef.setValue(profile);       // first login
+                } else {
+                    userRef.updateChildren(profile); // merge, keep chats/
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError e) { }
+        });
     }
+
 
     /* ---------------- static holder (resend) ---------------- */
     public static class VerifyOTPActivityHolder {

@@ -18,8 +18,14 @@ import com.example.securesamvad.model.User;
 import com.example.securesamvad.crypto.CryptoHelper;            // ✅ NEW
 import com.google.firebase.FirebaseException;
 import com.google.firebase.auth.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class RegisterActivity extends AppCompatActivity {
@@ -107,25 +113,41 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     /* ---------- save user (uid, phone, name, pubKey) ---------- */
+    /* ---------- save user (uid, phone, name, pubKey) ---------- */
     private void saveUserToDatabase() {
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        if (u == null) return;
+        FirebaseUser f = FirebaseAuth.getInstance().getCurrentUser();
+        if (f == null) return;
 
-        User user = new User(u.getUid(), u.getPhoneNumber(), "New User");
+        String uid   = f.getUid();
+        String phone = f.getPhoneNumber();
+
+        // fields we do (or may) want to update every sign‑in
+        Map<String,Object> profile = new HashMap<>();
+        profile.put("phone", phone);             // keep fresh
+        profile.put("name",  "New User");        // only used first time
 
         try {
-            String myPub = CryptoHelper.getMyPublicKey(this); // ✅ generate / fetch
-            user.setPubKey(myPub);                            // ✅ add to model
-        } catch (Exception e) {
-            Toast.makeText(this,"Key error: "+e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+            String myPub = CryptoHelper.getMyPublicKey(this);
+            profile.put("pubKey", myPub);        // only inserted if not present
+        } catch (Exception ignored) { }
 
-        FirebaseDatabase.getInstance().getReference("users")
-                .child(u.getUid())
-                .setValue(user)
-                .addOnFailureListener(e ->
-                        Toast.makeText(this,
-                                "Save failed: "+e.getMessage(),
-                                Toast.LENGTH_LONG).show());
+        DatabaseReference userRef =
+                FirebaseDatabase.getInstance().getReference("users").child(uid);
+
+        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override public void onDataChange(@NonNull DataSnapshot snap) {
+
+                /* first‑time sign‑in → create full node */
+                if (!snap.exists()) {
+                    userRef.setValue(profile);        // chats/ doesn’t exist yet
+                    return;
+                }
+
+                /* returning user → merge profile fields, keep chats/ */
+                userRef.updateChildren(profile);      // DOES NOT delete children
+            }
+            @Override public void onCancelled(@NonNull DatabaseError e) { }
+        });
     }
+
 }

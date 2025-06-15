@@ -18,7 +18,7 @@ import javax.crypto.KeyAgreement;
  *  • Fallback: P‑256 ECDH (works on Android 5‑11).
  * Derives a 32‑byte shared secret for AES.
  */
-public final class CryptoHelper {
+public  class CryptoHelper {
 
     private static final String PREF_NAME = "crypto_pref";
     private static final String PREF_PUB  = "PUB_KEY";
